@@ -10,13 +10,11 @@ from collections import deque
 # ─────────────────────────────
 # Configuration
 # ─────────────────────────────
-TELEGRAM_TOKEN = "8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU"
-CHAT_ID = "-2843689356"
-THREAD_MESSAGE_ID = "1"
-
-POOL_ADDRESS = "0x71942200c579319c89c357b55a9d5c0e0ad2403e".lower()
-TOKEN_ADDRESS = "0x82144c93bd531e46f31033fe22d1055af17a514c".lower()
-TOKEN_SYMBOL = "PENK"
+TELEGRAM_TOKEN = os.getenv("8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU")
+CHAT_ID = os.getenv("-2843689356")
+POOL_ADDRESS = os.getenv("0x71942200c579319c89c357b55a9d5c0e0ad2403e").lower()
+TOKEN_ADDRESS = os.getenv("0x82144c93bd531e46f31033fe22d1055af17a514c").lower()
+TOKEN_SYMBOL = os.getenv("TOKEN_SYMBOL", "PENK")
 MIN_TOKEN_AMOUNT = 1
 CIRCULATING_SUPPLY = 1_000_000_000
 
@@ -239,4 +237,5 @@ async def monitor_gecko_trades():
 if __name__ == "__main__":
     # Entry point for the async monitor loop
     asyncio.run(monitor_gecko_trades())
+
 
