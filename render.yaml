@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: python -u src/bankbybot.py
+    startCommand: python -u src/Penkbuybot.py
     envVars:
       - key: TELEGRAM_TOKEN
         value: "8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU"
