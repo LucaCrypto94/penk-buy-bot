@@ -14,17 +14,11 @@ from collections import deque
 TELEGRAM_TOKEN = os.getenv("8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU")
 CHAT_ID = os.getenv("-2843689356")
 THREAD_MESSAGE_ID = os.getenv("THREAD_MESSAGE_ID", "1")
-
 POOL_ADDRESS = os.getenv("POOL_ADDRESS", "0x71942200c579319c89c357b55a9d5c0e0ad2403e").lower()
 TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS", "0x82144c93bd531e46f31033fe22d1055af17a514c").lower()
 TOKEN_SYMBOL = os.getenv("TOKEN_SYMBOL", "PENK")
 MIN_TOKEN_AMOUNT = int(os.getenv("MIN_TOKEN_AMOUNT", 1))
 CIRCULATING_SUPPLY = int(os.getenv("CIRCULATING_SUPPLY", 1_000_000_000))
-
-# Path opzionale per GIF/logo header
-HEADER_GIF_PATH = os.getenv("HEADER_GIF_PATH", None)
-
-
 # ─────────────────────────────
 # Helper functions
 # ─────────────────────────────
@@ -246,4 +240,5 @@ if __name__ == "__main__":
         print("❌ Missing environment variables. Please check TELEGRAM_TOKEN, CHAT_ID, POOL_ADDRESS, TOKEN_ADDRESS.")
     else:
         asyncio.run(monitor_gecko_trades())
+
 
