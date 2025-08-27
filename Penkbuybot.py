@@ -1,4 +1,5 @@
 import telegram
+import os
 from telegram.ext import CommandHandler, MessageHandler
 import asyncio
 import requests
@@ -237,5 +238,6 @@ async def monitor_gecko_trades():
 if __name__ == "__main__":
     # Entry point for the async monitor loop
     asyncio.run(monitor_gecko_trades())
+
 
 
