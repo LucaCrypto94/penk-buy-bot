@@ -11,15 +11,14 @@ from collections import deque
 # Configuration
 # ─────────────────────────────
 TELEGRAM_TOKEN = "8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU"
-CHAT_ID = "-1002882624619"
-THREAD_MESSAGE_ID = "4294967297"
+CHAT_ID = "-2843689356"
+THREAD_MESSAGE_ID = "1"
 
 POOL_ADDRESS = "0x71942200c579319c89c357b55a9d5c0e0ad2403e".lower()
 TOKEN_ADDRESS = "0x82144c93bd531e46f31033fe22d1055af17a514c".lower()
 TOKEN_SYMBOL = "PENK"
-HEADER_GIF_PATH = "assets/alms.gif"
-MIN_TOKEN_AMOUNT = 10
-CIRCULATING_SUPPLY = 1_000_000_001
+MIN_TOKEN_AMOUNT = 1
+CIRCULATING_SUPPLY = 1_000_000_000
 
 # ─────────────────────────────
 # Helper functions
@@ -96,23 +95,34 @@ def build_buy_alert_message(
         f"🛒 Total Buy <code>$ {total:.2f}</code>\n"
         f"🐸 Amount: <code>{formatted_quantity} {symbol}</code>\n"
         f"💰 Market Cap: <code>$ {formatted_mc}</code>\n\n"
-        f"<a href='https://www.geckoterminal.com/pepe-unchained/pools/{pool_address}'>📊 GeckoTerminal</a>\n"
-        f"<a href='https://pepuscan.com/tx/{tx_hash}'>🔗 Transaction</a>\n"
-        f"<a href='https://pepuscan.com/address/{buyer}'>🔍 View Wallet</a>\n\n"
         f"{diamonds}"
     )
 
 
-async def send_telegram_alert(message, media_path=None):
-    """Send an alert to Telegram, optionally with an animation (GIF)."""
+async def send_telegram_alert(message, tx_hash, media_path=None):
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    thread_args = {"message_thread_id": int(THREAD_MESSAGE_ID)} if THREAD_MESSAGE_ID else {}
 
     keyboard = [
         [
-            InlineKeyboardButton("📈 Chart", url=f"https://www.geckoterminal.com/de/pepe-unchained/pools/{POOL_ADDRESS}"),
-            InlineKeyboardButton("💸 Buy now", url=f"https://pepuswap.com//#/swap?inputCurrency=ETH&outputCurrency={TOKEN_ADDRESS}"),
-        ]
+            InlineKeyboardButton(
+                "📈 Chart",
+                url=f"https://www.geckoterminal.com/pepe-unchained/pools/{POOL_ADDRESS}",
+            ),
+            InlineKeyboardButton(
+                "💸 Buy now",
+                url=f"https://pepuswap.com//#/swap?inputCurrency=ETH&outputCurrency={TOKEN_ADDRESS}",
+            ),
+        ],
+        [
+            InlineKeyboardButton("🌉 Superbridge", url="https://superbridge.pepubank.net/"),
+            InlineKeyboardButton("👨‍🎓 Advisor", url="https://web.telegram.org/k/#@Pepu_bank_bot"),
+        ],
+        [
+            InlineKeyboardButton(
+                "🔗 TX HASH",
+                url=f"https://pepuscan.com/tx/{tx_hash}",
+            ),
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -125,7 +135,7 @@ async def send_telegram_alert(message, media_path=None):
                     caption=message,
                     parse_mode="HTML",
                     reply_markup=reply_markup,
-                    **thread_args,
+                    disable_web_page_preview=True
                 )
         else:
             await bot.send_message(
@@ -133,15 +143,13 @@ async def send_telegram_alert(message, media_path=None):
                 text=message,
                 parse_mode="HTML",
                 reply_markup=reply_markup,
-                **thread_args,
+                disable_web_page_preview=True
             )
     except telegram.error.RetryAfter as e:
         print(f"⏳ Flood control – waiting {e.retry_after} seconds...")
         await asyncio.sleep(e.retry_after)
     except Exception as e:
         print("❌ Telegram send error:", e)
-
-
 def get_latest_gecko_trades(min_usd=MIN_TOKEN_AMOUNT):
     """Retrieve latest trades from GeckoTerminal filtered by minimum USD volume."""
     url = f"https://api.geckoterminal.com/api/v2/networks/pepe-unchained/pools/{POOL_ADDRESS}/trades"
@@ -231,3 +239,4 @@ async def monitor_gecko_trades():
 if __name__ == "__main__":
     # Entry point for the async monitor loop
     asyncio.run(monitor_gecko_trades())
+
