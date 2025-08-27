@@ -16,3 +16,4 @@ services:
         value: "0x82144c93bd531e46f31033fe22d1055af17a514c"
       - key: TOKEN_SYMBOL
         value: "PENK"
+        
