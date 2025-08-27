@@ -1,0 +1,18 @@
+services:
+  - type: worker
+    name: penk-buy-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u src/DEE/Penkbuybot.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: "8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU"
+      - key: CHAT_ID
+        value: "-2843689356"
+      - key: POOL_ADDRESS
+        value: "0x71942200c579319c89c357b55a9d5c0e0ad2403e"
+      - key: TOKEN_ADDRESS
+        value: "0x82144c93bd531e46f31033fe22d1055af17a514c"
+      - key: TOKEN_SYMBOL
+        value: "PENK"
