@@ -1,0 +1,304 @@
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+import asyncio
+import requests
+from datetime import datetime, timezone
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from tenacity import retry, wait_fixed, stop_after_attempt
+from collections import deque
+ 
+# ─────────────────────────────
+# Configuration
+# ─────────────────────────────
+ 
+TELEGRAM_TOKEN = "8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU"
+CHAT_ID = "-1002882624619"
+THREAD_MESSAGE_ID = "4294967297"
+ 
+POOL_ADDRESS = "0x71942200c579319c89c357b55a9d5c0e0ad2403e".lower()
+TOKEN_ADDRESS = "0x82144c93bd531e46f31033fe22d1055af17a514c".lower()
+TOKEN_SYMBOL = "PENK"
+HEADER_GIF_PATH = "assets/alms.gif"
+MIN_TOKEN_AMOUNT = 10
+CIRCULATING_SUPPLY = 1_000_000_001
+ 
+# ─────────────────────────────
+# Helper functions
+# ─────────────────────────────
+ 
+ 
+def shorten_address(address):
+    """
+    Shorten a wallet address for display, e.g. '0x1234...abcd'.
+    """
+    return address[:6] + "..." + address[-4:] if len(address) > 10 else address
+ 
+ 
+def calculate_diamonds(total_buy, token_symbol):
+    """
+    Return a string of emojis based on the purchased token amount.
+ 
+    Note:
+        The 'token_symbol' parameter is currently unused but kept
+        for compatibility with the original signature.
+    """
+    emoji = "🔍"
+    if total_buy >= 10_000_000:
+        return emoji * 100
+    elif total_buy >= 9_000_000:
+        return emoji * int(total_buy // 100_000)
+    elif total_buy >= 1_000_000:
+        return emoji * int(total_buy // 100_000)
+    else:
+        return ""
+ 
+ 
+@retry(wait=wait_fixed(2), stop=stop_after_attempt(5))
+def get_market_cap(pool_address):
+    """
+    Fetch market cap using GeckoTerminal's pool endpoint.
+ 
+    Returns:
+        float | str: Market cap in USD (float) or 'Nicht verfügbar' on failure.
+    """
+    try:
+        url = (
+            "https://api.geckoterminal.com/api/v2/"
+            f"networks/pepe-unchained/pools/{pool_address}"
+        )
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()["data"]["attributes"]
+        price_str = data.get("base_token_price_usd")
+        if price_str:
+            price = float(price_str)
+            return price * CIRCULATING_SUPPLY
+        else:
+            return "Nicht verfügbar"
+    except Exception as e:
+        print("Error fetching market cap:", e)
+        return "Nicht verfügbar"
+ 
+ 
+def build_buy_alert_message(
+    buyer,
+    quantity,
+    price,
+    market_cap,
+    total,
+    tx_hash,
+    symbol,
+    pool_address,
+    token_address,
+):
+    """
+    Build the HTML message body for a 'buy' alert.
+ 
+    Args:
+        buyer (str): Wallet address of the buyer.
+        quantity (float): Token amount purchased.
+        price (float): Price per token in USD.
+        market_cap (float|str): Market cap or 'Nicht verfügbar'.
+        total (float): Total trade volume in USD.
+        tx_hash (str): Transaction hash.
+        symbol (str): Token symbol.
+        pool_address (str): Pool address.
+        token_address (str): Token contract address.
+ 
+    Returns:
+        str: HTML-formatted message text.
+    """
+    buyer_link = (
+        f"<a href='https://pepuscan.com/address/{buyer}'>"
+        f"{shorten_address(buyer)}</a>"
+    )
+    formatted_quantity = f"{quantity:,.0f}".replace(",", ".")
+    formatted_mc = (
+        f"{float(market_cap):,.2f}" if isinstance(market_cap, (float, int)) else str(market_cap)
+    )
+ 
+    # Tiered badge depending on total USD volume
+    header = (
+        "🕵️‍♂️ Rookie Detective" if total < 150
+        else "🧪 Field Investigator" if total < 301
+        else "🧠 Criminal Profiler" if total < 501
+        else "🕶 Master Detective"
+    )
+ 
+    diamonds = calculate_diamonds(quantity, symbol)
+ 
+    return (
+        f"<b>{header}</b>\n"
+        f"<b>💸 Coin: {symbol} </b>\n\n"
+        f"🎯 Buyer {buyer_link}\n"
+        f"💲 Price <code>$ {price:.8f}</code>\n"
+        f"🛒 Total Buy <code>$ {total:.2f}</code>\n"
+        f"🐸 Amount: <code>{formatted_quantity} {symbol}</code>\n"
+        f"💰 Market Cap: <code>$ {formatted_mc}</code>\n\n"
+        f"<a href='https://www.geckoterminal.com/pepe-unchained/pools/{pool_address}'>📊 GeckoTerminal</a>\n"
+        f"<a href='https://pepuscan.com/tx/{tx_hash}'>🔗 Transaction</a>\n"
+        f"<a href='https://pepuscan.com/address/{buyer}'>🔍 View Wallet</a>\n\n"
+        f"{diamonds}"
+    )
+ 
+ 
+async def send_telegram_alert(message, media_path=None):
+    """
+    Send an alert to Telegram, optionally with an animation (GIF).
+ 
+    Args:
+        message (str): HTML-formatted message to send.
+        media_path (str|None): Path to a GIF to attach as animation.
+    """
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    thread_args = {"message_thread_id": int(THREAD_MESSAGE_ID)} if THREAD_MESSAGE_ID else {}
+ 
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "📈 Chart",
+                url=f"https://www.geckoterminal.com/de/pepe-unchained/pools/{POOL_ADDRESS}",
+            ),
+            InlineKeyboardButton(
+                "💸 Buy now",
+                url=f"https://pepuswap.com//#/swap?inputCurrency=ETH&outputCurrency={TOKEN_ADDRESS}",
+            ),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+ 
+    try:
+        if media_path:
+            with open(media_path, "rb") as f:
+                await bot.send_animation(
+                    chat_id=CHAT_ID,
+                    animation=f,
+                    caption=message,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup,
+                    **thread_args,
+                )
+        else:
+            await bot.send_message(
+                chat_id=CHAT_ID,
+                text=message,
+                parse_mode="HTML",
+                reply_markup=reply_markup,
+                **thread_args,
+            )
+    except telegram.error.RetryAfter as e:
+        # Respect Telegram flood control
+        print(f"⏳ Flood control – waiting {e.retry_after} seconds...")
+        await asyncio.sleep(e.retry_after)
+    except Exception as e:
+        print("❌ Telegram send error:", e)
+ 
+ 
+def get_latest_gecko_trades(min_usd=MIN_TOKEN_AMOUNT):
+    """
+    Retrieve latest trades from GeckoTerminal filtered by minimum USD volume.
+ 
+    Args:
+        min_usd (float): Minimum trade volume in USD to include.
+ 
+    Returns:
+        list: List of trade dicts (possibly empty on error).
+    """
+    url = (
+        "https://api.geckoterminal.com/api/v2/"
+        f"networks/pepe-unchained/pools/{POOL_ADDRESS}/trades"
+    )
+    params = {"trade_volume_in_usd_greater_than": min_usd}
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json().get("data", [])
+    except Exception as e:
+        print("Error fetching Gecko trades:", e)
+        return []
+ 
+ 
+async def monitor_gecko_trades():
+    """
+    Poll GeckoTerminal for new 'buy' trades and post them to Telegram.
+ 
+    Behavior:
+        - Skips already processed transactions (by tx hash).
+        - On first run, ignores trades older than 60 seconds to avoid spam.
+        - Enforces a short delay between notifications to be polite.
+    """
+    print("🧪 GeckoTrade monitoring started...")
+    processed_tx = deque(maxlen=1000)
+    first_run = True
+ 
+    while True:
+        trades = get_latest_gecko_trades(min_usd=MIN_TOKEN_AMOUNT)
+        print(f"🔍 Poll complete – received {len(trades)} trades")
+ 
+        new_trade_detected = False
+        found_count = 0
+ 
+        for t in trades:
+            attrs = t.get("attributes", {})
+            tx_hash = attrs.get("tx_hash")
+            if not tx_hash or tx_hash in set(processed_tx):
+                continue
+ 
+            if attrs.get("kind") != "buy":
+                continue
+ 
+            # Parse timestamp and compute staleness
+            timestamp_str = attrs.get("block_timestamp")
+            try:
+                trade_time = datetime.strptime(
+                    timestamp_str, "%Y-%m-%dT%H:%M:%SZ"
+                ).replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                seconds_old = (now - trade_time).total_seconds()
+            except Exception:
+                seconds_old = 999_999  # treat unparseable as stale
+ 
+            # On first run, ignore older trades to prevent a burst
+            if first_run and seconds_old > 60:
+                processed_tx.append(tx_hash)
+                continue
+ 
+            buyer = attrs.get("tx_from_address")
+            amount = float(attrs.get("to_token_amount", 0))
+            total = float(attrs.get("volume_in_usd", 0))
+            price = float(attrs.get("price_to_in_usd", 0))
+            market_cap = price * CIRCULATING_SUPPLY
+ 
+            if total < MIN_TOKEN_AMOUNT:
+                processed_tx.append(tx_hash)
+                continue
+ 
+            msg = build_buy_alert_message(
+                buyer=buyer,
+                quantity=amount,
+                price=price,
+                market_cap=market_cap,
+                total=total,
+                tx_hash=tx_hash,
+                symbol=TOKEN_SYMBOL,
+                pool_address=POOL_ADDRESS,
+                token_address=TOKEN_ADDRESS,
+            )
+ 
+            await send_telegram_alert(msg, media_path=HEADER_GIF_PATH)
+            processed_tx.append(tx_hash)
+            new_trade_detected = True
+            found_count += 1
+            await asyncio.sleep(1.5)
+ 
+        if new_trade_detected:
+            print(f"✅ Detected and sent {found_count} new buy(s)")
+ 
+        if first_run:
+            first_run = False
+ 
+        await asyncio.sleep(15)
+ 
+ 
+if __name__ == "__main__":
+    # Entry point for the async monitor loop
+    asyncio.run(monitor_gecko_trades())
