@@ -11,24 +11,24 @@ from collections import deque
 # ─────────────────────────────
 # Configuration (via Env Vars)
 # ─────────────────────────────
-TELEGRAM_TOKEN = os.getenv("8438467171:AAGtRIvbecoG4EzE01nlK2jNVWwazcRbvrU")
-CHAT_ID = os.getenv("-2843689356")
-THREAD_MESSAGE_ID = os.getenv("THREAD_MESSAGE_ID", 1)
-POOL_ADDRESS = os.getenv("POOL_ADDRESS", "0x71942200c579319c89c357b55a9d5c0e0ad2403e").lower()
-TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS", "0x82144c93bd531e46f31033fe22d1055af17a514c").lower()
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+THREAD_MESSAGE_ID = os.getenv("THREAD_MESSAGE_ID", None)
+
+POOL_ADDRESS = os.getenv("POOL_ADDRESS", "").lower()
+TOKEN_ADDRESS = os.getenv("TOKEN_ADDRESS", "").lower()
 TOKEN_SYMBOL = os.getenv("TOKEN_SYMBOL", "PENK")
 MIN_TOKEN_AMOUNT = int(os.getenv("MIN_TOKEN_AMOUNT", 1))
 CIRCULATING_SUPPLY = int(os.getenv("CIRCULATING_SUPPLY", 1_000_000_000))
+
 # ─────────────────────────────
 # Helper functions
 # ─────────────────────────────
 def shorten_address(address):
-    """Shorten a wallet address for display, e.g. '0x1234...abcd'."""
     return address[:6] + "..." + address[-4:] if len(address) > 10 else address
 
 
 def calculate_diamonds(total_buy, token_symbol):
-    """Return a string of emojis based on the purchased token amount."""
     emoji = "🔍"
     if total_buy >= 10_000_000:
         return emoji * 100
@@ -40,7 +40,6 @@ def calculate_diamonds(total_buy, token_symbol):
 
 @retry(wait=wait_fixed(2), stop=stop_after_attempt(5))
 def get_market_cap(pool_address):
-    """Fetch market cap using GeckoTerminal's pool endpoint."""
     try:
         url = f"https://api.geckoterminal.com/api/v2/networks/pepe-unchained/pools/{pool_address}"
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -59,17 +58,8 @@ def get_market_cap(pool_address):
 
 
 def build_buy_alert_message(
-    buyer,
-    quantity,
-    price,
-    market_cap,
-    total,
-    tx_hash,
-    symbol,
-    pool_address,
-    token_address,
+    buyer, quantity, price, market_cap, total, tx_hash, symbol, pool_address, token_address
 ):
-    """Build the HTML message body for a 'buy' alert."""
     buyer_link = f"<a href='https://pepuscan.com/address/{buyer}'>{shorten_address(buyer)}</a>"
     formatted_quantity = f"{quantity:,.0f}".replace(",", ".")
     formatted_mc = f"{float(market_cap):,.2f}" if isinstance(market_cap, (float, int)) else str(market_cap)
@@ -116,10 +106,7 @@ async def send_telegram_alert(message, tx_hash=None, media_path=None):
     ]
     if tx_hash:
         keyboard.append([
-            InlineKeyboardButton(
-                "🔗 TX HASH",
-                url=f"https://pepuscan.com/tx/{tx_hash}",
-            ),
+            InlineKeyboardButton("🔗 TX HASH", url=f"https://pepuscan.com/tx/{tx_hash}"),
         ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -151,7 +138,6 @@ async def send_telegram_alert(message, tx_hash=None, media_path=None):
 
 
 def get_latest_gecko_trades(min_usd=MIN_TOKEN_AMOUNT):
-    """Retrieve latest trades from GeckoTerminal filtered by minimum USD volume."""
     url = f"https://api.geckoterminal.com/api/v2/networks/pepe-unchained/pools/{POOL_ADDRESS}/trades"
     params = {"trade_volume_in_usd_greater_than": min_usd}
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -165,7 +151,6 @@ def get_latest_gecko_trades(min_usd=MIN_TOKEN_AMOUNT):
 
 
 async def monitor_gecko_trades():
-    """Poll GeckoTerminal for new 'buy' trades and post them to Telegram."""
     print("🧪 GeckoTrade monitoring started...")
     processed_tx = deque(maxlen=1000)
     first_run = True
@@ -220,7 +205,7 @@ async def monitor_gecko_trades():
                 token_address=TOKEN_ADDRESS,
             )
 
-            await send_telegram_alert(msg, tx_hash, media_path=HEADER_GIF_PATH)
+            await send_telegram_alert(msg, tx_hash)
             processed_tx.append(tx_hash)
             new_trade_detected = True
             found_count += 1
@@ -240,6 +225,3 @@ if __name__ == "__main__":
         print("❌ Missing environment variables. Please check TELEGRAM_TOKEN, CHAT_ID, POOL_ADDRESS, TOKEN_ADDRESS.")
     else:
         asyncio.run(monitor_gecko_trades())
-
-
-
